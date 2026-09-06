@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: httpd
+  namespace: default
+  labels:
+    app: webserver
+    tier: frontend
+    environment: dev
+spec:
+  containers:
+  - name: httpd-container
+    image: httpd:latest
+    ports:
+    - containerPort: 80
