@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: frontend-replicaset1
+  namespace: default
+  labels:
+    tier: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: frontend
+    matchExpressions:
+      - {
+          key: app,
+          operator: In,
+          values: ["webserver", "webserver3"]
+        }
+  template:
+    metadata:
+      labels:
+        app: webserver3
+        tier: frontend
+        environment: dev
+    spec:
+      containers:
+        - name: nginx-container-rs
+          image: nginx:latest
+          ports:
+            - containerPort: 80
