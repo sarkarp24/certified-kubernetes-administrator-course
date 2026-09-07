@@ -8,8 +8,8 @@ metadata:
 spec:
   replicas: 3
   selector:
-    matchLabels:
-      tier: frontend
+    #matchLabels:
+      #tier: frontend
     matchExpressions:
       - {
           key: app,
