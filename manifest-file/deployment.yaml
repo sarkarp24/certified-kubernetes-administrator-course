@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: default
+  labels:
+    tier: frontend
+spec:
+  replicas: 3
+  selector:
+    #matchLabels:
+      #tier: frontend
+    matchExpressions:
+      - {
+          key: app,
+          operator: In,
+          values: ["webserver", "webserver2"]
+        }
+  template:
+    metadata:
+      labels:
+        app: webserver
+        tier: frontend
+        environment: dev
+    spec:
+      containers:
+        - name: nginx-container-deployment
+          image: nginx:latest
+          ports:
+            - containerPort: 80
