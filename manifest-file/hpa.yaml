@@ -1,0 +1,11 @@
+apiVersion: autoscaling/v2
+metadata:
+  name: frontend-hpa
+spepc:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend-deployment
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 1
