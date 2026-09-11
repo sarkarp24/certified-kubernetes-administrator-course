@@ -26,5 +26,12 @@ spec:
       containers:
         - name: nginx-container-deployment
           image: nginx:latest
+          resources:
+            requests:
+              memory: 30Mi
+              cpu: 1m
+            limits:
+              memory: 40Mi
+              cpu: 1m
           ports:
             - containerPort: 80
