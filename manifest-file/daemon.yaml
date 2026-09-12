@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: frontend-daemonset
+  namespace: default
+  labels:
+    tier: frontend
+spec:
+  selector:
+    matchLabels:
+      app: webserver
+  template:
+    metadata:
+      labels:
+        app: webserver
+        tier: daemonset
+        environment: dev
+    spec:
+      containers:
+        - name: nginx-container-deployment
+          image: nginx:1.20
+          ports:
+            - containerPort: 80
