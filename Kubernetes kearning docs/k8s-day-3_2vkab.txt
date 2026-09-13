@@ -1,0 +1,669 @@
+Kubernetes Pods & YAML Manifests
+1. What is a Pod?
+
+A Pod is the smallest deployable unit in Kubernetes.
+
+A Pod provides an environment in which one or more containers can run.
+
+The basic relationship is:
+
+Kubernetes Cluster
+       │
+      Node
+       │
+      Pod
+       │
+   Container(s)
+
+Most commonly:
+
+Pod
+ └── Application Container
+
+For example:
+
+Pod
+ └── httpd Container
+2. Creating a Pod Using kubectl
+
+We can create a simple Pod imperatively using:
+
+kubectl run firstpod --image=httpd
+
+Here:
+
+kubectl
+   │
+   └── run
+        │
+        ├── Pod name = firstpod
+        │
+        └── Image = httpd
+
+The command tells Kubernetes:
+
+Create a Pod named firstpod and run an httpd container inside it.
+
+Check the Pod:
+
+kubectl get pods
+
+More information:
+
+kubectl describe pod firstpod
+
+Delete it:
+
+kubectl delete pod firstpod
+3. Imperative vs Declarative Approach
+
+There are two common ways of creating Kubernetes resources.
+
+Imperative
+
+You directly tell Kubernetes what command to execute.
+
+Example:
+
+kubectl run firstpod --image=httpd
+
+You are saying:
+
+Create this Pod for me.
+
+Declarative
+
+You define the desired state in a YAML file and tell Kubernetes to apply it.
+
+Example:
+
+kubectl apply -f app.yaml
+
+You are saying:
+
+This YAML describes the state I want. Make the cluster match it.
+
+For real-world Kubernetes work, the declarative approach is very common.
+
+4. YAML Files / Manifest Files / Spec Files
+
+Kubernetes resources are commonly defined using YAML manifest files.
+
+You may hear:
+
+YAML file
+Manifest
+Kubernetes manifest
+Resource definition
+Configuration file
+
+For example:
+
+app.yaml
+
+The file can define a Pod:
+
+app.yaml
+    │
+    ↓
+Kubernetes Pod
+5. Applying a YAML File
+
+Suppose we have:
+
+app.yaml
+
+We can create/update the resource using:
+
+kubectl apply -f app.yaml
+
+The -f means:
+
+Read the resource definition from this file.
+
+6. Deleting a Resource Defined in YAML
+
+If the resource was created using:
+
+kubectl apply -f app.yaml
+
+we can delete the resource using:
+
+kubectl delete -f app.yaml
+
+So remember:
+
+Create / Update
+      ↓
+kubectl apply -f app.yaml
+
+Delete
+      ↓
+kubectl delete -f app.yaml
+7. What is YAML?
+
+YAML originally stood for:
+
+YAML Ain't Markup Language
+
+YAML is a human-readable data serialization language.
+
+It is used to represent structured data.
+
+For example:
+
+name: Mike
+age: 30
+city: Mumbai
+
+This represents data as key-value pairs.
+
+name → Mike
+age  → 30
+city → Mumbai
+
+Kubernetes uses YAML extensively to describe resources.
+
+8. Basic YAML Structure
+
+Consider:
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: webpod
+
+spec:
+  containers:
+  - name: webcontainer
+    image: httpd
+
+Let's understand each section.
+
+9. apiVersion
+apiVersion: v1
+
+apiVersion tells Kubernetes which API version should be used to interpret the resource definition.
+
+For example:
+
+apiVersion: v1
+
+or:
+
+apiVersion: apps/v1
+
+Think of it as:
+
+API Group + API Version
+
+For example:
+
+apps/v1
+│    │
+│    └── Version
+└───── API Group
+Important
+
+For resources in the core API group, such as Pod:
+
+apiVersion: v1
+
+You don't write:
+
+apiVersion: core/v1
+
+v1 represents the core API group.
+
+For example:
+
+kind: Pod
+apiVersion: v1
+
+Whereas Deployment belongs to the apps API group:
+
+apiVersion: apps/v1
+kind: Deployment
+10. kind
+kind: Pod
+
+kind tells Kubernetes what type of resource you want to create.
+
+Examples:
+
+kind: Pod
+kind: Deployment
+kind: Service
+kind: ConfigMap
+kind: Secret
+
+So:
+
+kind: Pod
+      ↓
+Create a Pod
+
+kind: Deployment
+      ↓
+Create a Deployment
+
+kind: Service
+      ↓
+Create a Service
+11. metadata
+metadata:
+  name: webpod
+
+metadata contains information about the Kubernetes resource.
+
+For example:
+
+metadata:
+  name: webpod
+
+Here:
+
+metadata
+   │
+   └── name = webpod
+
+Other metadata fields you'll encounter later include:
+
+metadata:
+  name: webpod
+  namespace: production
+  labels:
+    app: web
+12. spec
+spec:
+
+spec describes the desired configuration/specification of the resource.
+
+For a Pod, the spec can define things such as:
+
+Containers
+Images
+Ports
+Volumes
+Environment variables
+Resource requests/limits
+Restart behavior
+
+For example:
+
+spec:
+  containers:
+  - name: webcontainer
+    image: httpd
+13. containers
+
+Inside the Pod specification:
+
+spec:
+  containers:
+
+containers is a list/array.
+
+It defines the containers that should run inside the Pod.
+
+Example:
+
+containers:
+- name: webcontainer
+  image: httpd
+
+The - indicates a list item.
+
+Conceptually:
+
+containers:
+   │
+   └── Item 1
+        ├── name: webcontainer
+        └── image: httpd
+14. Complete Pod YAML
+
+Here is a clean Pod manifest:
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: webpod
+
+spec:
+  containers:
+    - name: webcontainer
+      image: httpd
+
+Save this as:
+
+app.yaml
+
+Then:
+
+kubectl apply -f app.yaml
+
+Check:
+
+kubectl get pods
+
+You should see:
+
+NAME      READY   STATUS    RESTARTS   AGE
+webpod    1/1     Running   0          ...
+15. Understanding the YAML Hierarchy
+
+This is extremely important.
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: webpod
+
+spec:
+  containers:
+    - name: webcontainer
+      image: httpd
+
+Think of the hierarchy like this:
+
+Pod
+│
+├── apiVersion
+│
+├── kind
+│
+├── metadata
+│    └── name
+│
+└── spec
+     └── containers
+          └── container
+               ├── name
+               └── image
+
+Indentation is important in YAML.
+
+16. YAML Uses Indentation
+
+YAML uses indentation to represent hierarchy.
+
+Correct:
+
+metadata:
+  name: webpod
+
+Incorrect:
+
+metadata:
+name: webpod
+
+Similarly:
+
+spec:
+  containers:
+    - name: webcontainer
+      image: httpd
+
+The indentation tells YAML which fields belong to which parent.
+
+Important rule
+
+Use spaces consistently.
+
+A common practice is 2 spaces per indentation level.
+
+Avoid using tabs.
+
+17. YAML Key Naming — Camel Case
+
+Kubernetes YAML uses specific field names.
+
+For example:
+
+apiVersion:
+
+Notice:
+
+api + Version
+
+This is camelCase.
+
+Examples:
+
+apiVersion
+metadata
+containerPort
+imagePullPolicy
+restartPolicy
+
+Camel case example:
+
+Ram Sharma
+     ↓
+ramSharma
+Ram Kumar Sharma
+     ↓
+ramKumarSharma
+
+The first word starts with lowercase and subsequent words start with uppercase letters.
+
+18. One Container Per Pod
+
+In most basic Kubernetes deployments, you'll commonly see:
+
+Pod
+ └── Application Container
+
+For example:
+
+Pod
+ └── nginx
+
+or:
+
+Pod
+ └── httpd
+
+However, Kubernetes does support multiple containers inside a Pod.
+
+19. Multiple Containers in a Pod
+
+Example:
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: webpod
+
+spec:
+  containers:
+    - name: webcontainer
+      image: httpd
+
+    - name: nginx
+      image: nginx
+
+This creates:
+
+Pod: webpod
+│
+├── webcontainer
+│    └── httpd
+│
+└── nginx
+     └── nginx
+
+Both containers belong to the same Pod.
+
+20. Why Run Multiple Containers in One Pod?
+
+Multiple containers in the same Pod are generally used when the containers are tightly coupled and need to work together.
+
+A common pattern is the sidecar container.
+
+Pod
+│
+├── Main Application Container
+│
+└── Sidecar Container
+
+The sidecar supports the main application.
+
+Examples of sidecar responsibilities can include:
+
+Log collection
+Proxying
+Configuration synchronization
+Monitoring/telemetry
+Certificate management
+
+For example:
+
+Pod
+│
+├── Application
+│
+└── Log Collector
+
+The application does the main work while the sidecar provides supporting functionality.
+
+21. Pod vs Container
+
+This distinction is very important.
+
+Container
+
+A container is the running instance of a container image.
+
+Image
+  ↓
+Container
+Pod
+
+A Pod is the Kubernetes execution unit that encapsulates one or more containers.
+
+Pod
+│
+├── Container
+│
+└── Container
+
+Therefore:
+
+Pod ≠ Container
+
+A Pod contains containers.
+
+22. Important Kubernetes YAML Structure
+
+For almost every Kubernetes resource, get comfortable recognizing:
+
+apiVersion: ...
+kind: ...
+
+metadata:
+  ...
+
+spec:
+  ...
+
+Conceptually:
+
+apiVersion
+     ↓
+Which API understands this resource?
+
+kind
+     ↓
+What resource is this?
+
+metadata
+     ↓
+Information about the resource
+
+spec
+     ↓
+What do I want this resource to look like?
+
+For a Pod:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webpod
+spec:
+  containers:
+    - name: webcontainer
+      image: httpd
+
+23. Useful Commands
+Create Pod imperatively
+kubectl run firstpod --image=httpd
+
+Create/update from YAML
+kubectl apply -f app.yaml
+List Pods
+kubectl get pods
+
+Detailed Pod information
+kubectl describe pod webpod
+
+View Pod YAML from Kubernetes
+kubectl get pod webpod -o yaml
+
+Delete using YAML
+kubectl delete -f app.yaml
+
+Delete directly by name
+kubectl delete pod webpod
+
+Check app/container logs 
+kubeclt logs webpod
+
+Take container shell
+kubectl exec -it webpod -- bash
+
+24. Complete Flow
+
+The complete process can be remembered as:
+
+                 Write YAML
+                     │
+                     ↓
+                 app.yaml
+                     │
+                     ↓
+          kubectl apply -f app.yaml
+                     │
+                     ↓
+               kube-apiserver
+                     │
+                     ↓
+                 Scheduler
+                     │
+                     ↓
+                Worker Node
+                     │
+                     ↓
+                    Pod
+                     │
+                     ↓
+                 Container
+                     │
+                     ↓
+              Container Image
+
+And when you delete:
+
+kubectl delete -f app.yaml
+              │
+              ↓
+        kube-apiserver
+              │
+              ↓
+          Pod deleted

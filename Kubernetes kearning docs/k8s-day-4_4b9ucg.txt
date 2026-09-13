@@ -1,0 +1,901 @@
+Kubernetes — Namespaces, Labels, Selectors & Services
+1. Kubernetes Namespace
+What is a Namespace?
+
+A Namespace provides a logical boundary inside a Kubernetes cluster.
+
+It is mainly used to:
+
+Group related Kubernetes resources
+Logically segregate applications
+Apply resource limits
+Implement access control
+Avoid naming conflicts between teams/applications
+Important clarification
+
+A namespace does not physically separate pods.
+
+Think of it as:
+
+Namespace = logical grouping / segregation of Kubernetes resources
+
+Example: One Kubernetes Cluster
+
+Imagine we have one Kubernetes cluster running multiple applications:
+
+                    Kubernetes Cluster
+                           |
+        +------------------+------------------+
+        |                  |                  |
+     wordpress           jenkins           monitoring
+       namespace         namespace          namespace
+        |                  |                  |
+    +-------+          +---------+       +-------------+
+    |       |          |         |       |             |
+   web     mysql     jenkins1  jenkins2 prometheus   grafana
+    pod     pod        pod       pod       pod          pod
+WordPress Namespace
+namespace: wordpress
+
+web pod
+mysql pod
+
+Check:
+
+kubectl get pods -n wordpress
+Jenkins Namespace
+namespace: jenkins
+
+jenkins pod
+jenkins agent pod
+jenkins other pods
+
+Check:
+
+kubectl get pods -n jenkins
+Monitoring Namespace
+namespace: monitoring
+
+prometheus pod
+grafana pod
+
+Check:
+
+kubectl get pods -n monitoring
+Default Namespace
+
+When you don't specify a namespace, Kubernetes normally uses the default namespace for namespaced resources.
+
+For example:
+
+kubectl run webpod --image=httpd
+
+creates the pod in:
+
+default namespace
+
+Equivalent:
+
+kubectl run webpod --image=httpd -n default
+
+To see pods in the current/default namespace:
+
+kubectl get pods
+
+To see pods across all namespaces:
+
+kubectl get pods -A
+2. Creating a Namespace
+Using kubectl
+kubectl create namespace webapp
+
+or:
+
+kubectl create ns webapp
+
+Then create a pod inside it:
+
+kubectl run webpod --image=httpd -n webapp
+
+Check:
+
+kubectl get pods -n webapp
+3. Creating Namespace Using YAML
+
+File:
+
+webapp-ns.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: webapp
+
+Create it:
+
+kubectl apply -f webapp-ns.yaml
+
+Verify:
+
+kubectl get namespaces
+
+or:
+
+kubectl get ns
+4. Why Do We Need Namespaces?
+
+There are several important use cases.
+
+Use Case 1 — Logical Segregation
+
+Suppose one cluster contains:
+
+wordpress
+jenkins
+monitoring
+argocd
+
+We can create:
+
+wordpress namespace
+jenkins namespace
+monitoring namespace
+argocd namespace
+
+This makes the cluster easier to organize.
+
+Use Case 2 — Resource Limits
+
+Suppose Jenkins is running in:
+
+jenkins namespace
+
+We want the workloads in that namespace to consume at most:
+
+CPU    = 8 CPUs
+Memory = 4 GB
+
+We can use a ResourceQuota.
+
+Conceptually:
+
+jenkins namespace
+       |
+       +-- pod
+       +-- pod
+       +-- pod
+
+Namespace ResourceQuota
+       |
+       +-- CPU <= 8
+       +-- Memory <= 4 GB
+
+So namespaces provide a boundary within which we can apply policies such as resource quotas.
+
+Use Case 3 — Access Control
+
+Namespaces are also useful with RBAC.
+
+For example:
+
+DevOps
+   |
+   +---- access to Jenkins namespace
+
+SRE
+   |
+   +---- access to Monitoring namespace
+   |
+   +---- access to ArgoCD namespace
+
+This can be implemented using Kubernetes Role / RoleBinding and related RBAC mechanisms.
+
+5. Namespace Important Point
+
+A namespace is not the same as a network boundary.
+
+For example:
+
+namespace A
+    pod A
+
+namespace B
+    pod B
+
+By default, pods can communicate across namespaces if networking policies do not restrict them.
+
+Namespaces primarily provide:
+
+Logical organization
+Resource management
+Access-control scope
+6. Labels
+
+Now we come to one of the most important concepts in Kubernetes:
+
+Labels
+
+A label is a key-value pair attached to a Kubernetes resource.
+
+Examples:
+
+app: nginx
+env: test
+user: edureka
+
+So:
+
+key       value
+ |          |
+app       nginx
+env       test
+user      edureka
+7. Where Can Labels Be Used?
+
+Labels can be attached to many Kubernetes resources, including:
+
+Pods
+Services
+Deployments
+Nodes
+Namespaces
+ReplicaSets
+etc.
+
+Example:
+
+metadata:
+  labels:
+    app: nginx
+    env: test
+8. Example Pod With Labels
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: nginx-pod
+  labels:
+    app: nginx
+    env: test
+    user: edureka
+
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+
+This pod has three labels:
+
+app = nginx
+env = test
+user = edureka
+9. Why Do We Need Labels?
+
+Labels allow Kubernetes resources to be:
+
+Identified
+Grouped logically
+Filtered
+Selected
+
+The most important use case is:
+
+Selectors
+
+This becomes extremely important when we discuss Services.
+
+10. Viewing Labels
+
+To see labels attached to pods:
+
+kubectl get pods --show-labels
+
+Example:
+
+NAME         READY   STATUS    LABELS
+nginx-pod    1/1     Running   app=nginx,env=test
+
+You can also use:
+
+kubectl get pods -o wide --show-labels
+11. Adding a Label
+
+Suppose we already have:
+
+myfirstpod
+
+Add:
+
+kubectl label pod myfirstpod application=nginx
+
+Verify:
+
+kubectl get pod myfirstpod --show-labels
+12. Removing a Label
+
+To remove the label:
+
+kubectl label pod myfirstpod application-
+
+The - means:
+
+Remove this label.
+
+13. Selectors
+
+A selector is used to find Kubernetes resources based on labels.
+
+For example:
+
+Pod 1
+app=nginx
+
+Pod 2
+app=apache
+
+Pod 3
+app=nginx
+
+Selector:
+
+app=nginx
+
+matches:
+
+Pod 1
+Pod 3
+14. Services
+
+Now we can understand why labels and selectors are extremely important.
+
+What is a Service?
+
+A Kubernetes Service provides a stable network endpoint for a group of Pods.
+
+The key idea is:
+
+             Service
+                |
+        +-------+-------+
+        |               |
+       Pod             Pod
+     IP: 10.1.1.5    IP: 10.1.1.8
+
+The Pods can be recreated.
+
+Their IP addresses can change.
+
+But the Service remains stable.
+
+15. Why Do We Need Services?
+
+There are two major problems with directly communicating with Pods.
+
+Problem 1 — Pod IPs are not stable
+
+Suppose:
+
+web-pod
+IP = 10.1.1.10
+
+Another application communicates with:
+
+10.1.1.10
+
+Now the pod dies.
+
+Kubernetes creates a replacement:
+
+web-pod
+IP = 10.1.1.25
+
+The old IP is gone.
+
+Therefore, using Pod IPs directly is unreliable.
+
+16. Problem 2 — We Need a Stable Name
+
+Instead of:
+
+Application
+     |
+     v
+10.1.1.10
+
+we want:
+
+Application
+     |
+     v
+web-service
+     |
+     +---- Pod
+     |
+     +---- Pod
+
+The application can use the Service name.
+
+Kubernetes DNS provides name resolution for Services.
+
+For example:
+
+web-service
+
+resolves to the Service's virtual IP.
+
+So applications don't need to know individual Pod IP addresses.
+
+17. Important Correction About Pod Names
+
+Your original notes say:
+
+Pod names are not resolved to their respective IPs by Kubernetes DNS.
+
+This is generally correct for ordinary Pods in the way you're describing application-to-application communication.
+
+The recommended pattern is:
+
+Application
+     |
+     v
+Service DNS name
+     |
+     v
+Pods
+
+For example:
+
+mysql-service
+
+rather than trying to connect to:
+
+mysql-pod
+
+There are special DNS behaviors for Pods and headless Services, but for normal application communication:
+
+Use a Service.
+
+18. Service + Labels + Selectors
+
+This is the most important relationship:
+
+                Service
+                   |
+             Selector
+            app=webserver
+                   |
+          +--------+--------+
+          |                 |
+       Pod 1              Pod 2
+   app=webserver      app=webserver
+
+The Service uses its selector to identify the Pods to which it should send traffic.
+
+19. Example Pod
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: pod-clusterip
+  labels:
+    app: webserver
+
+spec:
+  containers:
+    - name: nginxcontainer
+      image: nginx:latest
+
+Notice:
+
+labels:
+  app: webserver
+20. Example Service
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: clusterip-service
+
+spec:
+  selector:
+    app: webserver
+
+  ports:
+    - protocol: TCP
+      port: 801
+      targetPort: 80
+
+  type: ClusterIP
+
+The important part is:
+
+selector:
+  app: webserver
+
+The Service looks for Pods having:
+
+app=webserver
+
+Our Pod has:
+
+app=webserver
+
+Therefore:
+
+clusterip-service
+       |
+       | selector: app=webserver
+       |
+       v
+pod-clusterip
+       |
+    nginx:80
+21. port vs targetPort
+
+This is another important concept.
+
+ports:
+  - protocol: TCP
+    port: 801
+    targetPort: 80
+port
+
+The port exposed by the Service.
+
+Service : 801
+targetPort
+
+The port on the Pod/container application.
+
+Pod : 80
+
+So:
+
+Client
+   |
+   | :801
+   v
+Service
+   |
+   | forwards to :80
+   v
+Pod
+ nginx :80
+22. How Does Service Know Which Pods to Use?
+
+Through the selector.
+
+Service:
+
+selector:
+  app: webserver
+
+Pod:
+
+labels:
+  app: webserver
+
+Kubernetes finds Pods matching the selector.
+
+Therefore:
+
+Service selector
+       |
+       v
+app=webserver
+       |
+       +-------- Pod A
+       |
+       +-------- Pod B
+       |
+       +-------- Pod C
+23. What Happens When a Pod Dies?
+
+Suppose:
+
+Service
+   |
+   +---- Pod A 10.1.1.10
+   +---- Pod B 10.1.1.11
+
+Pod A dies.
+
+A new Pod is created:
+
+Service
+   |
+   +---- Pod B 10.1.1.11
+   +---- Pod C 10.1.1.20
+
+Because Pod C still has:
+
+app=webserver
+
+the Service automatically includes it as a backend.
+
+The application doesn't need to know that the Pod changed.
+
+That's one of the major benefits of Services.
+
+24. Endpoints
+
+The Service maintains a list of backend endpoints.
+
+You can inspect them using:
+
+kubectl get endpoints
+
+For a specific Service:
+
+kubectl get endpoints clusterip-service
+
+You can also use:
+
+kubectl describe service clusterip-service
+
+You'll see information about the selected endpoints.
+
+Modern Kubernetes note
+
+In newer Kubernetes versions, EndpointSlice is the preferred underlying API rather than the older Endpoints API.
+
+You can inspect them with:
+
+kubectl get endpointslices
+
+For learning the basic Service concept, however, kubectl get endpoints is still useful.
+
+25. Service Types
+
+Kubernetes has four commonly discussed Service types:
+
+ClusterIP
+NodePort
+LoadBalancer
+ExternalName
+
+The three you'll use most often are:
+
+ClusterIP
+NodePort
+LoadBalancer
+26. ClusterIP
+Purpose
+
+Used for internal communication inside the cluster.
+
+Example:
+
+                 Kubernetes Cluster
+                        |
+                  ClusterIP Service
+                   10.96.10.20
+                        |
+              +---------+---------+
+              |                   |
+             Pod                 Pod
+
+Applications inside the cluster can access:
+
+clusterip-service:801
+
+Example:
+
+type: ClusterIP
+
+If you don't specify type, ClusterIP is the default Service type.
+
+27. NodePort
+
+NodePort exposes the Service on a port on each Kubernetes node.
+
+Conceptually:
+
+External Client
+      |
+      v
+Node IP :30080
+      |
+      v
+NodePort Service
+      |
+      v
+Pods
+
+Example:
+
+type: NodePort
+
+You can specify a port such as:
+
+ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
+
+Then:
+
+NodeIP:30080
+
+can be used to reach the Service.
+
+28. LoadBalancer
+
+LoadBalancer is commonly used in cloud environments.
+
+Conceptually:
+
+             Internet
+                |
+                v
+        Cloud Load Balancer
+                |
+                v
+             Service
+                |
+        +-------+-------+
+        |       |       |
+       Pod     Pod     Pod
+
+Example:
+
+kubectl run lb-pod --image=nginx
+
+Expose it:
+
+kubectl expose pod lb-pod \
+  --type=LoadBalancer \
+  --port=80 \
+  --target-port=80 \
+  --name=lbsvc
+
+Check:
+
+kubectl get svc
+
+In a cloud environment, Kubernetes/cloud integration can provision an external load balancer.
+
+29. Service Types — Quick Comparison
+Type	Main Purpose	Accessible From
+ClusterIP	Internal service	Inside cluster
+NodePort	Expose through node port	Outside + inside cluster
+LoadBalancer	External load balancer	External clients
+ExternalName	DNS alias to external service	DNS-based access
+
+Think:
+
+ClusterIP
+   ↓
+Internal
+
+NodePort
+   ↓
+Node IP + Port
+
+LoadBalancer
+   ↓
+External Load Balancer
+30. Useful Commands
+Namespace
+kubectl get ns
+kubectl create ns webapp
+kubectl get pods -n webapp
+kubectl get pods -A
+Pods
+kubectl get pods
+kubectl get pods -o wide
+kubectl get pods --show-labels
+kubectl get pods -o wide --show-labels
+Labels
+
+Add:
+
+kubectl label pod myfirstpod application=nginx
+
+Remove:
+
+kubectl label pod myfirstpod application-
+Services
+kubectl get svc
+kubectl describe svc clusterip-service
+Endpoints
+kubectl get endpoints
+kubectl get endpoints clusterip-service
+
+Modern Kubernetes:
+
+kubectl get endpointslices
+31. The Big Picture
+
+The concepts we've covered are connected:
+
+                     Kubernetes Cluster
+                            |
+       +--------------------+--------------------+
+       |                    |                    |
+   Namespace             Namespace            Namespace
+   wordpress              jenkins              monitoring
+       |                    |                    |
+    Pods                 Pods                 Pods
+       |                    |                    |
+       |                 Labels               Labels
+       |                    |                    |
+       |                    v                    |
+       |                 Service                |
+       |                    |                    |
+       +--------------------+--------------------+
+                            |
+                         Selector
+                            |
+                       Matching Pods
+
+The key relationship to remember is:
+
+Namespace
+   ↓
+Logical segregation of resources
+
+Labels
+   ↓
+Identify / categorize resources
+
+Selectors
+   ↓
+Find resources using labels
+
+Service
+   ↓
+Provides stable access to Pods
+
+Pod IP
+   ↓
+Can change
+
+Service IP / DNS
+   ↓
+Stable endpoint
+One-line definitions for revision
+
+Namespace:
+
+A logical boundary used to organize and segregate Kubernetes resources.
+
+Label:
+
+A key-value tag attached to a Kubernetes resource for identification, grouping, and selection.
+
+Selector:
+
+A mechanism used to select resources based on labels.
+
+Service:
+
+A stable network endpoint that provides access to a group of Pods.
+
+ClusterIP:
+
+Provides internal cluster access to a Service.
+
+NodePort:
+
+Exposes a Service through a port on Kubernetes nodes.
+
+LoadBalancer:
+
+Exposes a Service through an external/cloud load balancer.
+
+And the most important flow:
+
+             Service
+                |
+             Selector
+                |
+          app=webserver
+                |
+        +-------+-------+
+        |               |
+       Pod             Pod
+   app=webserver   app=webserver
+        |               |
+      nginx           nginx
+
+Labels identify the Pods → Selector finds them → Service provides stable access to them.

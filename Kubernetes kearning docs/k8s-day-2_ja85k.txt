@@ -1,0 +1,625 @@
+1. Managed Kubernetes Services
+
+Cloud providers offer managed Kubernetes services, where the cloud provider manages much of the Kubernetes control plane for you.
+
+Examples:
+
+Cloud Provider	Managed Kubernetes
+Google Cloud	GKE
+AWS	EKS
+Microsoft Azure	AKS
+Oracle Cloud	OKE
+IBM Cloud	IKS
+
+The basic idea is:
+
+                    Managed Kubernetes
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+        Control Plane                Worker Nodes
+        Managed by                  Managed by
+        Cloud Provider              Customer / Provider
+
+The exact responsibilities differ between services and configuration, but the important learning point is:
+
+In managed Kubernetes, the cloud provider manages the Kubernetes control plane, while you primarily manage your workloads and worker-node resources.
+
+2. GKE
+
+GKE = Google Kubernetes Engine
+
+GKE is Google's managed Kubernetes service.
+
+A typical GKE architecture looks like:
+
+                    GKE Cluster
+                        │
+          ┌─────────────┴─────────────┐
+          │                           │
+     Control Plane                Worker Nodes
+     Managed by Google            In your GCP project
+          │                           │
+    ┌─────┼─────┐                ┌────┼────┐
+    │     │     │                │    │    │
+ API   Scheduler etcd           Pod  Pod  Pod
+Server
+
+You normally don't manage the control-plane machines directly.
+
+3. Creating a GKE Cluster
+
+Before creating a cluster, you need to select your GCP project.
+
+List projects
+gcloud projects list
+
+Example:
+
+demo9-403705
+Select the project
+gcloud config set project demo9-403705
+
+Now subsequent GCP commands operate against this project by default.
+
+4. Enable Required GCP APIs
+
+Enable Compute Engine API:
+
+gcloud services enable compute.googleapis.com
+
+Enable Kubernetes Engine API:
+
+gcloud services enable container.googleapis.com
+
+The Kubernetes Engine API is required to create/manage GKE clusters.
+
+5. Set Default Region and Zone
+
+You can configure defaults so you don't have to repeatedly specify them.
+
+gcloud config set compute/region us-central1
+gcloud config set compute/zone us-central1-a
+
+Now commands can use these defaults.
+
+6. Create a GKE Cluster
+
+Basic command:
+
+gcloud container clusters create hello-cluster \
+    --num-nodes=2 \
+    --zone=us-central1-a
+
+Here:
+
+--num-nodes=2
+        │
+        └── Number of worker nodes
+
+So:
+
+GKE Cluster
+     │
+     ├── Worker Node 1
+     └── Worker Node 2
+
+The control plane is managed by Google.
+
+7. How Many Worker Nodes?
+
+This option determines the number of worker nodes:
+
+--num-nodes=2
+
+Therefore:
+
+--num-nodes=2  → 2 worker nodes
+--num-nodes=3  → 3 worker nodes
+--num-nodes=5  → 5 worker nodes
+
+Example:
+
+gcloud container clusters create hello-cluster \
+    --num-nodes=2 \
+    --zone=us-central1-a
+
+creates a cluster with 2 worker nodes in the specified configuration.
+
+8. How Many Control-Plane Nodes?
+
+This is an important distinction.
+
+When using GKE, you generally do not directly specify the number of control-plane machines in the same way you specify worker nodes.
+
+Google manages the control plane for you.
+
+Conceptually:
+
+Your GCP Project
+│
+└── GKE Cluster
+      │
+      ├── Google-managed Control Plane
+      │
+      ├── Worker Node 1
+      └── Worker Node 2
+
+You interact with the control plane through the Kubernetes API.
+
+9. Worker Node Machine Size
+
+You can specify the machine type for worker nodes.
+
+Example:
+
+gcloud container clusters create hello-cluster \
+    --num-nodes=2 \
+    --zone=us-central1-a \
+    --machine-type=e2-highcpu-8
+
+Here:
+
+--num-nodes=2
+        ↓
+2 worker nodes
+
+--machine-type=e2-highcpu-8
+        ↓
+Machine type of the worker nodes
+
+So conceptually:
+
+Worker Node 1
+    └── e2-highcpu-8
+
+Worker Node 2
+    └── e2-highcpu-8
+Important
+
+Don't memorize:
+
+"Default is always 2 CPU and 4 GB."
+
+The actual default machine type depends on the GKE command/version/configuration and should be checked rather than assumed.
+
+The better concept to remember is:
+
+--machine-type controls the VM type used for the worker nodes.
+
+10. Resizing a GKE Cluster
+
+Increase the number of worker nodes:
+
+gcloud container clusters resize hello-cluster \
+    --num-nodes=3 \
+    --zone=us-central1-a
+
+Now:
+
+Before:
+
+Worker 1
+Worker 2
+
+
+After:
+
+Worker 1
+Worker 2
+Worker 3
+
+Reduce it:
+
+gcloud container clusters resize hello-cluster \
+    --num-nodes=1 \
+    --zone=us-central1-a
+
+Now only one worker node remains in that node pool.
+
+In production, resizing should be done carefully because reducing nodes can cause workloads to be rescheduled or disrupted depending on workload configuration.
+
+11. Delete the GKE Cluster
+gcloud container clusters delete hello-cluster \
+    --zone=us-central1-a
+
+This deletes the cluster and its associated resources according to the cluster configuration.
+
+12. Example GKE Output
+
+You may see something like:
+
+NAME: hello-cluster
+LOCATION: us-central1-a
+MASTER_VERSION: 1.35.6-gke.1710000
+MASTER_IP: 34.171.195.130
+MACHINE_TYPE: e2-medium
+NODE_VERSION: 1.35.6-gke.1710000
+NUM_NODES: 2
+STATUS: RUNNING
+STACK_TYPE: IPV4
+
+Let's understand it:
+
+Field	Meaning
+NAME	Cluster name
+LOCATION	Cluster location
+MASTER_VERSION	Kubernetes version of the control plane
+MASTER_IP	Kubernetes API endpoint address
+MACHINE_TYPE	Worker-node VM machine type
+NODE_VERSION	Kubernetes version running on nodes
+NUM_NODES	Number of worker nodes
+STATUS	Current cluster status
+STACK_TYPE	IP networking configuration
+13. How Does kubectl Know the API Server Address?
+
+This is a very important Kubernetes concept.
+
+Suppose the GKE control plane API endpoint is:
+
+34.171.195.130:6443
+
+You execute:
+
+kubectl get nodes
+
+How does kubectl know where to send the request?
+
+The answer is:
+
+kubeconfig
+
+Usually:
+
+$HOME/.kube/config
+
+The configuration contains information about the Kubernetes cluster, including the API server endpoint and authentication information.
+
+Conceptually:
+
+$HOME/.kube/config
+       │
+       ├── Cluster information
+       │      └── API Server address
+       │
+       ├── User / credentials
+       │
+       └── Context
+14. kubectl Request Flow
+
+When you execute:
+
+kubectl get nodes
+
+the flow is approximately:
+
+User
+ │
+ │ kubectl get nodes
+ ↓
+kubectl
+ │
+ │ reads kubeconfig
+ ↓
+API Server
+ │
+ │ Kubernetes API request
+ ↓
+Control Plane
+ │
+ ↓
+Cluster state
+ │
+ ↓
+Response
+ │
+ ↓
+kubectl
+ │
+ ↓
+Terminal
+
+So:
+
+kubectl does not magically discover the master/control-plane address. It uses the cluster information stored in kubeconfig.
+
+15. Cloud Shell
+
+Google Cloud Shell is simply a cloud-hosted shell environment.
+
+It is not automatically the Kubernetes control plane and it is not a worker node.
+
+Conceptually:
+
+                 Google Cloud
+                      │
+       ┌──────────────┼──────────────┐
+       │              │              │
+   Cloud Shell    GKE Control     Worker Nodes
+                  Plane
+       │              │              │
+       │              │              │
+       └──── kubectl ─┴──────────────┘
+
+Cloud Shell runs kubectl, which communicates with the GKE API server.
+
+16. Getting Credentials for GKE
+
+When you create or connect to a GKE cluster, you normally configure kubectl with the cluster credentials using:
+
+gcloud container clusters get-credentials hello-cluster \
+    --zone us-central1-a
+
+This updates your kubeconfig.
+
+Then:
+
+kubectl get nodes
+
+can communicate with the GKE API server.
+
+Think:
+
+gcloud get-credentials
+          ↓
+$HOME/.kube/config
+          ↓
+kubectl
+          ↓
+GKE API Server
+17. Production Kubernetes — Control Plane
+
+For a self-managed Kubernetes cluster, a common production architecture is:
+
+Control Plane
+ ├── Master 1
+ ├── Master 2
+ └── Master 3
+
+Worker Nodes
+ ├── Worker 1
+ ├── Worker 2
+ ├── Worker 3
+ └── ...
+
+Three control-plane nodes are commonly used to provide control-plane high availability.
+
+However:
+
+Don't apply "3 masters" as a universal rule. Managed services such as GKE and EKS abstract much of this control-plane management from you.
+
+18. EKS
+
+EKS = Amazon Elastic Kubernetes Service
+
+EKS is AWS's managed Kubernetes service.
+
+Conceptually:
+
+                    EKS Cluster
+                        │
+          ┌─────────────┴─────────────┐
+          │                           │
+     AWS-managed                 Worker Nodes
+     Control Plane               / Node Groups
+          │                           │
+    API Server etcd               Pods
+
+AWS manages the EKS control plane.
+
+You primarily manage:
+
+Worker nodes / node groups
+Pods
+Services
+Applications
+Networking configuration
+IAM permissions
+Storage, etc.
+19. eksctl
+
+eksctl is a command-line utility specifically designed to simplify creation and management of EKS clusters.
+
+Install it:
+
+curl --silent --location \
+"https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+| tar xz -C /tmp
+
+Move it into your PATH:
+
+sudo mv /tmp/eksctl /usr/local/bin
+
+Verify:
+
+eksctl version
+20. EKS Cluster Creation — Step 1
+
+Create the EKS control plane without a node group:
+
+eksctl create cluster \
+    --name=eksdemo1 \
+    --region=us-east-1 \
+    --zones=us-east-1a,us-east-1b \
+    --without-nodegroup
+
+This creates the EKS cluster/control-plane infrastructure but does not create worker nodes.
+
+Therefore:
+
+kubectl get nodes
+
+may return:
+
+No resources found
+
+This is expected.
+
+Conceptually:
+
+EKS Cluster
+     │
+     ├── Control Plane ✓
+     │
+     └── Worker Nodes ✗
+
+21. Check EKS Cluster
+eksctl get clusters
+
+This displays the EKS clusters managed by eksctl.
+
+22. IAM OIDC Provider
+
+Next:
+
+eksctl utils associate-iam-oidc-provider \
+    --region us-east-1 \
+    --cluster eksdemo1 \
+    --approve
+
+This associates an IAM OIDC identity provider with the EKS cluster.
+
+This is commonly used to allow Kubernetes workloads to obtain AWS IAM permissions through mechanisms such as IAM Roles for Service Accounts (IRSA).
+
+Conceptually:
+
+Kubernetes Service Account
+          ↓
+       OIDC
+          ↓
+      AWS IAM Role
+          ↓
+      AWS Services
+
+This is an important EKS-specific concept.
+
+23. Create EC2 Key Pair
+
+Create an EC2 key pair in the AWS console.
+
+Example:
+
+kube-demo
+
+The key pair can be used for SSH access to worker nodes when SSH access is enabled.
+
+Your example later uses linux_kp, so make sure the key-pair name in the node-group command exactly matches the key pair you created.
+
+24. Create EKS Managed Node Group
+
+Example:
+
+eksctl create nodegroup \
+    --cluster=eksdemo1 \
+    --region=us-east-1 \
+    --name=eksdemo1-ng-public1 \
+    --node-type=t3.medium \
+    --nodes=2 \
+    --nodes-min=2 \
+    --nodes-max=4 \
+    --node-volume-size=20 \
+    --ssh-access \
+    --ssh-public-key=linux_kp \
+    --managed \
+    --asg-access \
+    --external-dns-access \
+    --full-ecr-access \
+    --appmesh-access \
+    --alb-ingress-access
+
+Let's break down the important parameters.
+
+Parameter	Meaning
+--cluster	EKS cluster name
+--region	AWS region
+--name	Node group name
+--node-type	EC2 instance type
+--nodes	Initial number of nodes
+--nodes-min	Minimum desired node count
+--nodes-max	Maximum node count
+--node-volume-size	Node root volume size
+--ssh-access	Enables SSH access
+--ssh-public-key	EC2 key pair to use
+--managed	Creates an EKS managed node group
+
+
+25. EKS Worker Nodes
+
+With:
+
+--nodes=2
+
+the node group starts with:
+
+EKS Cluster
+     │
+     ├── Worker Node 1
+     └── Worker Node 2
+
+Verify:
+
+kubectl get nodes
+
+You should now see two worker nodes.
+
+26. EKS Node Auto Scaling
+
+These parameters:
+
+--nodes=2
+--nodes-min=2
+--nodes-max=4
+
+mean conceptually:
+
+Initial nodes = 2
+
+Minimum = 2
+Maximum = 4
+
+So the node group can operate between:
+
+2 ─────────────── 4
+↑                 ↑
+Minimum           Maximum
+
+The exact scaling behavior depends on the autoscaling configuration and what is triggering scaling.
+
+27. Check Node Groups
+eksctl get nodegroup --cluster=eksdemo1
+
+This shows the node groups associated with the cluster.
+
+28. Deploy a Test Pod
+
+Once worker nodes are available:
+
+kubectl run testpod --image=nginx
+
+Check:
+
+kubectl get pods
+
+You should see something similar to:
+
+NAME      READY   STATUS    RESTARTS   AGE
+testpod   1/1     Running   0          ...
+
+The flow is:
+
+kubectl
+   │
+   ↓
+EKS API Server
+   │
+   ↓
+Scheduler
+   │
+   ↓
+Worker Node
+   │
+   ↓
+Pod
+   │
+   ↓
+nginx Container
