@@ -4,3 +4,5 @@ metadata:
   name: standard-sc
 provisioner: kubernetes.io/gce-pd
 allowVolumeExpansion: true
+
+## kubectl create secret generic mysql-pass --from-literal=password=password123  ## command to create secret as an alternative to secret.yaml file
