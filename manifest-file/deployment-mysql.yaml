@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-mysql
+  namespace: default
+  labels:
+    tier: db
+spec:
+  replicas: 3
+  selector:
+    #matchLabels:
+      #tier: frontend
+    matchExpressions:
+      - {
+          key: app,
+          operator: In,
+          values: ["mysql"]
+        }
+  template:
+    metadata:
+      name: mysql-pod
+      labels:
+        app: mysql
+        tier: db
+        environment: dev
+    spec:
+      containers:
+        - name: mysql-pod
+          image: mysql:latest
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "rootpassword"
