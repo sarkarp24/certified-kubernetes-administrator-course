@@ -1,0 +1,22 @@
+node selector (choose a node using corresponding label) equality based selector
+
+Command to label nodes ->
+kubectl get nodes --show-labels
+kubectl label node k8s-worker app=frontend
+
+To remove label --> 
+kubectl label node k8s-worker app-
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    env: test
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    imagePullPolicy: IfNotPresent
+  nodeSelector:
+    app: frontend

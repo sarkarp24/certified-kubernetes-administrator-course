@@ -1,0 +1,171 @@
+Step 1-6 --> execute on master and worker both
+Step 7,9 and 10 --> on master
+Step 8 --> on worker
+
+create machines for master and worker (minimum 2 CPU and 2 GB are required) with ubuntu 22.04 operating system
+===================================================================================================
+1. Network Pre-requisite
+
+sudo su - 
+
+modprobe br_netfilter
+lsmod | grep br_netfilter
+
+cat > /etc/sysctl.d/k8s.conf << EOF
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sysctl --system
+
+
+2. Install Containerd
+
+sudo apt update 
+sudo apt install containerd -y
+sudo mkdir /etc/containerd
+containerd config default>/etc/containerd/config.toml
+sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+sudo systemctl status containerd
+
+
+
+3. Add the GPG key for kubernetes
+
+mkdir -p /etc/apt/keyrings/
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+
+4. Add kubernetes repository
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+
+5. Update the repositories
+
+sudo apt-get update
+
+
+6. Install Kubernetes packages.
+
+sudo apt-get install -y kubelet kubeadm kubectl
+
+
+7. Execute below command on master node to initialize kubernetes cluster
+
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+***run on master node**
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+***run on master node**
+
+output of init command will give you kubeadm join command that needs to be executed on worker node
+in case join command is lost we can get it again
+kubeadm token create --print-join-command
+
+
+8. Add the worker node, execute below command on worker node
+
+kubeadm join <master-ip-address>:6443 --token st99ja.3bulo53e3wlmunbk --discovery-token-ca-cert-hash sha256:41dfafa343841da6a5460f8fa89647192ec1c7f46b3029c280ff4063b940041f
+
+
+9. Deploy pod network on master, network will be created automatically on all nodes that are part of cluster
+
+There are many network plugins available calico and flannel are 2 most popular ones, deploy any one.
+
+Flannel -->
+kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+
+OR 
+
+
+Calico --> 
+
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/tigera-operator.yaml
+curl https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/custom-resources.yaml -O
+kubectl create -f custom-resources.yaml
+
+
+10. Test operations
+
+kubectl get nodes
+kubectl run firstpod --image=nginx
+kubectl expose po firstpod --type=NodePort --port 80 --name firstsvc
+
+===============================================================================================================
+
+
+Kubernetes needs 3 layers to work:
+
+1. OS / Kernel (networking rules)
+2. Container Runtime (runs containers)
+3. Kubernetes (orchestrates everything)
+
+
+Same node communication
+Pod A ──> veth ──> cni0 (Linux bridge) ──> veth ──> Pod B
+
+Here:
+
+cni0 = Linux bridge
+Pods connect to it like a virtual switch
+
+ Different node communication
+Pod A → cni0 → flannel (encapsulation) → network → other node → cni0 → Pod B
+
+Here Flannel:
+
+wraps packet (VXLAN / UDP)
+sends across nodes
+
+
+Modprobe --> 
+
+Enables Linux to inspect traffic between containers
+
+Without this module:
+
+iptables rules won’t apply to bridged traffic
+network policies break
+services won’t work
+
+
+nf = Netfilter
+
+Netfilter = Linux firewall framework
+iptables is built on top of Netfilter
+
+iptables does not see (process) bridge traffic by default
+With that option, we force bridge traffic through iptables (Netfilter)
+
+iptables works via Netfilter
+Netfilter is NOT applied to bridge traffic by default
+bridge-nf-call-iptables enables it
+
+
+IP Forward --> 
+
+Pod A (Node1) → Node1 → Node2 → Pod B
+Node1 must forward traffic to Node2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

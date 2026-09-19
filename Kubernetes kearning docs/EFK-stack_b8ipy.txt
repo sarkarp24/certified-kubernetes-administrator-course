@@ -1,0 +1,291 @@
+Monitoring --> metric + visualization + alerts 
+
+Prometheus + grafana 
+
+
+Logging Part --> EFK stack 
+
+elastic search (data storage) + Fluent bit (data collection) + Kibana (data visualization)
+
+
+what is logging ? why do we need it ?
+
+Monitoring 	  			Purpose				Logging
+
+exporters (/metric) 	data collection 	 fluent bit 
+Prometheus server 		data storage 		Elastic Search
+Grafana (visualization)	data visualization	Kibana Dashboard
+
+pod application fails --> kubectl logs podname -c containername
+
+what if pod is killed ?? --> how can I see the logs , we require some central logging whwre logs arestored irrespective of pod is present or not 
+
+go to the worker node and see the kubelet logs --> journalctl -u kubelet
+
+looging stack --> stores the logs even if pod dies 
+
+how do we set it up 
+
+EFK (fluentbit) / ELK (logstash)/ EMK (metricbeat)/
+
+Logstash --> bit heavy (more cpu and RAM) as compared to fluentbit
+
+fluentbit --> Light weight/ opensource / natively integrated with k8s 
+
+
+
+Deploying EFK stack --> 
+
+helm repo add fluent https://fluent.github.io/helm-charts/
+
+helm repo add elastic https://helm.elastic.co
+
+kubectl create ns logging
+
+kubectl config set-context --current --namespace=logging
+
+helm install elasticsearch elastic/elasticsearch \
+  -n logging \
+  --set replicas=1 \
+  --set minimumMasterNodes=1 \
+  --set resources.requests.cpu=500m \
+  --set resources.requests.memory=1Gi \
+  --set volumeClaimTemplate.resources.requests.storage=10Gi
+
+
+kubectl get secret elasticsearch-master-credentials -n logging \
+  -o jsonpath="{.data.password}" | base64 --decode; echo
+  
+# username is --> elastic , password is --> qayquoeQ6H2WidlE
+
+# service/elasticsearch-master            ClusterIP   34.118.231.55   <none>        9200/TCP,9300/TCP   15m
+  
+helm install kibana elastic/kibana \
+  -n logging \
+  --set service.type=NodePort
+
+cat fluent-values-v1.yaml
+
+config:
+  outputs: |
+    [OUTPUT]
+        Name  es
+        Match *
+        Host  elasticsearch-master
+        Port  9200
+        HTTP_User elastic
+        HTTP_Passwd qayquoeQ6H2WidlE
+        tls   On
+        tls.verify Off
+        Logstash_Format On
+        Logstash_Prefix kubernetes
+        Suppress_Type_Name On
+        Retry_Limit False
+		
+
+helm install fluent-bit fluent/fluent-bit \
+  -n logging \
+  -f fluent-values-v1.yaml
+
+
+kubectl port-forward svc/elasticsearch-master 9200 -n logging
+
+
+curl -k -u elastic:qayquoeQ6H2WidlE  https://localhost:9200/_cat/indices?v
+
+health status index                 uuid                   pri rep docs.count docs.deleted store.size pri.store.size
+yellow open   kubernetes-2026.04.27 grHNvWkTSRejMCUdHzcfjg   1   1        265            0    465.1kb        465.1kb
+
+
+
+curl -k -u elastic:qayquoeQ6H2WidlE  -X PUT  https://localhost:9200/_all/_settings  -H 'Content-Type: application/json'   -d '{
+    "index": {
+      "number_of_replicas": 0
+    }
+  }'
+
+
+curl -k -u elastic:qayquoeQ6H2WidlE -X DELETE "https://localhost:9200/kubernetes-*?pretty"
+
+curl -k -u elastic:<password> https://localhost:9200/kubernetes-*/_search?pretty
+
+
+
+kubernetes.namespace_name : "default"
+kubernetes.namespace_name : "default" AND kubernetes.pod_name : dbpod
+kubernetes.namespace_name : "default" AND log : "error"
+
+log : ("error" OR "exception" OR "fail")
+
+Option 1 — Exclude by namespace
+
+[FILTER]
+    Name    grep
+    Match   kube.*
+    Exclude kubernetes.namespace_name kube-system
+    Exclude kubernetes.namespace_name logging
+	
+Option 2 — Exclude specific pod/app
+
+[FILTER]
+    Name    grep
+    Match   kube.*
+    Exclude kubernetes.pod_name fluent-bit
+	
+Option 3 — Include only default namespace
+
+[FILTER]
+    Name  grep
+    Match kube.*
+    Regex kubernetes.namespace_name default
+	
+---------------------------------------------------------	
+	  
+kubectl rollout restart daemonset fluent-bit -n logging
+
+	  
+	  
+What is the kubernetes filter doing?
+
+The kubernetes filter enriches logs.
+
+Before it runs:
+
+{
+  "log": "GET /index.html 200"
+}
+
+After it runs:
+
+{
+  "log": "GET /index.html 200",
+  "kubernetes": {
+    "namespace_name": "default",
+    "pod_name": "nginx-xyz"
+  }
+}
+
+
+Fluent Bit pipeline
+INPUT → FILTER → OUTPUT
+
+This order is not configurable
+
+Stage	Purpose
+INPUT	Read logs (files, containers)
+FILTER	Modify / enrich / drop logs
+OUTPUT	Send logs to destination (Elasticsearch)
+
+curl -k -u elastic:1MsKy5qSLDlxzJdl -X DELETE https://localhost:9200/kubernetes-2026.04.27
+----------------------------------------------------------------------------------------------------
+
+Dashboards --> 
+Kibana → Visualize Library → Create visualization
+Lens
+
+
+Create Visualization (Error Count)
+
+log : ("error" OR "ERROR" OR "fail" OR "exception")
+log : ("error" or "fail" or "exception")
+
+Query:
+log : ("error" or "fail" or "exception")
+
+X-axis:
+@timestamp
+interval = 1 minute
+
+Y-axis:
+Count
+
+
+Top Error Pods (MOST IMPORTANT chart) -> Which pod is causing the most errors?
+
+Y-axis (important)
+Drag:
+kubernetes.pod_name.keyword
+This becomes:
+List of pods
+
+X-axis
+Count of records
+Means:
+Number of error logs per pod
+
+
+
+
+fluent-bit values
+
+config:
+  filters: |
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Merge_Log On
+        Keep_Log Off
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude On
+
+    [FILTER]
+        Name grep
+        Match kube.*
+        Exclude $kubernetes['namespace_name'] kube-system
+        Exclude $kubernetes['namespace_name'] logging
+        Exclude $kubernetes['namespace_name'] monitoring
+
+  outputs: |
+    [OUTPUT]
+        Name  es
+        Match *
+        Host  elasticsearch-master
+        Port  9200
+        HTTP_User elastic
+        HTTP_Passwd 1MsKy5qSLDlxzJdl
+        tls   On
+        tls.verify Off
+        Logstash_Format On
+        Logstash_Prefix kubernetes
+        Suppress_Type_Name On
+        Retry_Limit False
+================================================================
+
+config:
+  outputs: |
+    [OUTPUT]
+        Name  es
+        Match *
+        Host  elasticsearch-master
+        Port  9200
+        HTTP_User elastic
+        HTTP_Passwd 1MsKy5qSLDlxzJdl
+        tls   On
+        tls.verify Off
+        Logstash_Format On
+        Logstash_Prefix kubernetes
+        Suppress_Type_Name On
+        Retry_Limit False
+		
+ILM --> 
+
+{
+  "index.lifecycle.name": "kubernetes-logs-policy"
+}
+
+
+ curl -k -u elastic:1MsKy5qSLDlxzJdl  https://localhost:9200/kubernetes-*/_settings?pretty
+ 
+attach policy to index 
+ 
+curl -X PUT "https://localhost:9200/kubernetes-2026.04.27/_settings" \
+-u elastic:1MsKy5qSLDlxzJdl -k \
+-H 'Content-Type: application/json' \
+-d '{
+  "index.lifecycle.name": "kubernetes-logs-policy"
+}'
+
+verify --> 
+
+ curl -k -u elastic:1MsKy5qSLDlxzJdl  https://localhost:9200/kubernetes-*/_settings?pretty
+
