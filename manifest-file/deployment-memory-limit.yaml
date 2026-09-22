@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: tenant-b-100mi
+  labels:
+    tier: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: webserver
+        tier: frontend
+        environment: dev
+    spec:
+      containers:
+        - name: nginx-container-deployment
+          image: nginx:latest
+          resources:
+            requests:
+              memory: 150Mi
+          ports:
+            - containerPort: 80

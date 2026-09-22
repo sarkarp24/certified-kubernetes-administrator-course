@@ -47,6 +47,8 @@ chmod 600 ~/.kube/config
         ```bash
         kubectl get pods -n kube-system
         ```
+# Alternative to Calico, flannel CNI
+kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
 
 1.  Install Calico CNI for cluster networking
 

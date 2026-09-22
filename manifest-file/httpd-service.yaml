@@ -11,3 +11,5 @@ spec:
     - protocol: TCP
       port: 801
       targetPort: 80
+
+#kubectl expose deployment nginx-deployment --type=NodePort --port 80 --target-port 80 --name testsvc

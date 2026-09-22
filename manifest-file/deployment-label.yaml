@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deployment
+  labels:
+    Tier: Web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      Tier: Web
+  template:
+    metadata:
+      labels:
+        Tier: Web
+    spec:
+      containers:
+        - name: nginx-deployment
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-deployment
+  labels:
+    Tier: App
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      Tier: App
+  template:
+    metadata:
+      labels:
+        Tier: App
+    spec:
+      containers:
+        - name: httpd-deployment
+          image: httpd:latest
+          ports:
+            - containerPort: 80
